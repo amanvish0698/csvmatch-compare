@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CSV Match & Compare</title>
+
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+<style>
+:root {
+  --bg: #0b0f1a;
+  --card: rgba(255,255,255,0.08);
+  --border: rgba(255,255,255,0.15);
+  --accent: #4f9cff;
+  --text: #e5e7eb;
+}
+
+body {
+  background: radial-gradient(circle at top, #10162f, #050712);
+  font-family: "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  padding: 40px;
+}
+
+.container {
+  max-width: 880px;
+  margin: auto;
+  background: var(--card);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 30px;
+}
+
+h1 {
+  font-size: 22px;
+  margin-bottom: 20px;
+  color: white;
+}
+
+.step {
+  margin-top: 18px;
+  display: none;
+  animation: fadeIn 0.4s ease;
+}
+
+.step.active {
+  display: block;
+}
+
+label {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+select, input {
+  width: 100%;
+  padding: 12px;
+  margin-top: 6px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: white;
+  outline: none;
+}
+
+select:focus, input:focus {
+  border-color: var(--accent);
+}
+
+button {
+  margin-top: 30px;
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #4f9cff, #6ee7ff);
+  color: #020617;
+  font-size: 15px;
+  cursor: pointer;
+  display: none;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* FIX: Dropdown option visibility in dark UI */
+select option {
+  background-color: #0b0f1a;   /* dark background */
+  color: #e5e7eb;              /* light text */
+}
+
+/* When option is hovered / selected */
+select option:checked,
+select option:hover {
+  background-color: #2563eb;  /* blue highlight */
+  color: #ffffff;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<h1>CSV Matching & Comparison Engine</h1>
+
+<div class="step active">
+  <label>Upload File 1 (Primary)</label>
+  <input type="file" id="file1" accept=".csv">
+
+  <label style="margin-top:14px">Upload File 2 (Reference)</label>
+  <input type="file" id="file2" accept=".csv">
+</div>
+
+<div class="step" id="step1">
+  <label>File 1 Matching Column</label>
+  <select id="f1Match"></select>
+</div>
+
+<div class="step" id="step2">
+  <label>File 2 Matching Column</label>
+  <select id="f2Match"></select>
+</div>
+
+<div class="step" id="step3">
+  <label>Collected Amount Column (File 1)</label>
+  <select id="f1Amount"></select>
+</div>
+
+<div class="step" id="step4">
+  <label>Total Dues Column (File 2)</label>
+  <select id="f2Amount"></select>
+</div>
+
+<div class="step" id="step5">
+  <label>Result Column Name</label>
+  <input id="resultCol" value="Payment Type">
+</div>
+
+<button id="processBtn">Process & Download CSV</button>
+
+</div>
+
+<script>
+let d1=[], d2=[], h1=[], h2=[];
+
+const show = id => document.getElementById(id).classList.add("active");
+
+function populate(sel, headers) {
+  sel.innerHTML = "<option value=''>Select</option>";
+  headers.forEach(h => {
+    const o = document.createElement("option");
+    o.value = h; o.text = h;
+    sel.appendChild(o);
+  });
+}
+
+file1.onchange = () => {
+  Papa.parse(file1.files[0], {
+    header:true, skipEmptyLines:true,
+    complete:r => {
+      d1=r.data; h1=Object.keys(r.data[0]);
+      populate(f1Match,h1); populate(f1Amount,h1);
+      show("step1");
+    }
+  });
+};
+
+file2.onchange = () => {
+  Papa.parse(file2.files[0], {
+    header:true, skipEmptyLines:true,
+    complete:r => {
+      d2=r.data; h2=Object.keys(r.data[0]);
+      populate(f2Match,h2); populate(f2Amount,h2);
+    }
+  });
+};
+
+f1Match.onchange = ()=>show("step2");
+f2Match.onchange = ()=>show("step3");
+f1Amount.onchange = ()=>show("step4");
+f2Amount.onchange = ()=>show("step5");
+resultCol.oninput = ()=>processBtn.style.display="block";
+
+processBtn.onclick = () => {
+  const map={}; d2.forEach(r=>map[r[f2Match.value]]=r);
+  const headers=[];
+  h1.forEach(h=>{ headers.push(h); if(h===f1Amount.value) headers.push(resultCol.value); });
+
+  const out=d1.map(r=>{
+    const m=map[r[f1Match.value]];
+    let res="Not Matched";
+    if(m) res=Number(r[f1Amount.value])>=Number(m[f2Amount.value])?"Full":"Part";
+    const o={}; headers.forEach(h=>o[h]=h===resultCol.value?res:r[h]);
+    return o;
+  });
+
+  const csv=Papa.unparse(out);
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="modified_file.csv";
+  a.click();
+};
+</script>
+
+</body>
+</html>
